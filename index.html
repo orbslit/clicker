@@ -193,8 +193,9 @@
     function spawnRipple(x, y) {
       const el = document.createElement('div');
       el.className = 'ripple';
-      el.style.left = (x - 100) + 'px';
-      el.style.top = (y - 100) + 'px';
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.style.transform = 'translate(-50%, -50%)';
       document.body.appendChild(el);
       setTimeout(() => el.remove(), 600);
     }
@@ -238,12 +239,11 @@
     }
 
     btn.addEventListener('click', async (e) => {
-      const rect = btn.getBoundingClientRect();
-      const x = rect.left + rect.width / 2;
-      const y = rect.top;
+      const x = e.clientX;
+      const y = e.clientY;
       
       spawnParticle(x, y);
-      spawnRipple(e.clientX, e.clientY);
+      spawnRipple(x, y);
       
       // Optimistic update
       updateDisplay(currentCount + 1, true);
