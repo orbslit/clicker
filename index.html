@@ -149,11 +149,25 @@
     <span id="statusText">connecting...</span>
   </div>
 
+  <!-- Firebase SDK (compat for simplicity in a single HTML file) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+
   <script>
-    const STORAGE_KEY = 'orbs-clicker';
-    const API_BASE = 'https://api.counterapi.dev/v1';
-    const NAMESPACE = 'orbslit-clicker';
-    const COUNTER_NAME = 'global-clicks';
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyB6436yNFjVOL1YszQuaJ2RvPqEfijF8XE",
+      authDomain: "orbs-clicker.firebaseapp.com",
+      databaseURL: "https://orbs-clicker-default-rtdb.firebaseio.com",
+      projectId: "orbs-clicker",
+      storageBucket: "orbs-clicker.firebasestorage.app",
+      messagingSenderId: "837247041152",
+      appId: "1:837247041152:web:1cbaad4aeefd41cc18b065"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const clicksRef = db.ref('clicks');
 
     const counterEl = document.getElementById('counter');
     const btn = document.getElementById('clickBtn');
@@ -161,16 +175,14 @@
     const statusText = document.getElementById('statusText');
 
     let currentCount = 0;
-    let online = false;
 
     function formatNumber(n) {
       return n.toLocaleString();
     }
 
     function setStatus(isOnline) {
-      online = isOnline;
       statusDot.className = 'dot ' + (isOnline ? 'online' : 'offline');
-      statusText.textContent = isOnline ? 'live' : 'offline — using local count';
+      statusText.textContent = isOnline ? 'live · firebase' : 'offline';
     }
 
     function updateDisplay(n, animate = false) {
@@ -202,79 +214,36 @@
       setTimeout(() => el.remove(), 600);
     }
 
-    async function fetchCount() {
-      try {
-        const res = await fetch(`${API_BASE}/${NAMESPACE}/${COUNTER_NAME}`);
-        if (!res.ok) throw new Error('not found');
-        const data = await res.json();
-        setStatus(true);
-        return data.count || 0;
-      } catch {
-        // Try to create the counter if it doesn't exist
-        try {
-          const res = await fetch(`${API_BASE}/${NAMESPACE}/${COUNTER_NAME}/up`);
-          if (res.ok) {
-            const data = await res.json();
-            setStatus(true);
-            return data.count || 0;
-          }
-        } catch {}
-        setStatus(false);
-        return parseInt(localStorage.getItem(STORAGE_KEY) || '0');
+    // Real-time listener — updates instantly when anyone clicks
+    clicksRef.on('value', (snapshot) => {
+      const val = snapshot.val() || 0;
+      setStatus(true);
+      if (val !== currentCount) {
+        updateDisplay(val, true);
       }
-    }
+    });
 
-    async function incrementCount() {
-      try {
-        const res = await fetch(`${API_BASE}/${NAMESPACE}/${COUNTER_NAME}/up`);
-        if (!res.ok) throw new Error('fail');
-        const data = await res.json();
-        setStatus(true);
-        localStorage.setItem(STORAGE_KEY, data.count);
-        return data.count;
-      } catch {
-        setStatus(false);
-        const local = parseInt(localStorage.getItem(STORAGE_KEY) || '0') + 1;
-        localStorage.setItem(STORAGE_KEY, local);
-        return local;
-      }
-    }
+    // Handle connection state
+    db.ref('.info/connected').on('value', (snap) => {
+      setStatus(snap.val() === true);
+    });
 
+    // Click handler — use transaction for atomic increment
     btn.addEventListener('click', async (e) => {
       const x = e.clientX;
       const y = e.clientY;
-      
+
       spawnParticle(x, y);
       spawnRipple(x, y);
-      
+
       // Optimistic update
       updateDisplay(currentCount + 1, true);
-      
-      const newCount = await incrementCount();
-      updateDisplay(newCount);
+
+      // Atomic increment via Firebase transaction
+      clicksRef.transaction((current) => {
+        return (current || 0) + 1;
+      });
     });
-
-    // Init
-    (async () => {
-      const count = await fetchCount();
-      updateDisplay(count);
-    })();
-
-    // Poll for updates from other users every 5s
-    setInterval(async () => {
-      try {
-        const res = await fetch(`${API_BASE}/${NAMESPACE}/${COUNTER_NAME}`);
-        if (res.ok) {
-          const data = await res.json();
-          setStatus(true);
-          if (data.count > currentCount) {
-            updateDisplay(data.count, true);
-          }
-        }
-      } catch {
-        setStatus(false);
-      }
-    }, 5000);
   </script>
 </body>
 </html>
