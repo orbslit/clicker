@@ -175,12 +175,14 @@
     const statusText = document.getElementById('statusText');
 
     let currentCount = 0;
+    let connected = false;
 
     function formatNumber(n) {
       return n.toLocaleString();
     }
 
     function setStatus(isOnline) {
+      connected = isOnline;
       statusDot.className = 'dot ' + (isOnline ? 'online' : 'offline');
       statusText.textContent = isOnline ? 'live · firebase' : 'offline';
     }
@@ -230,6 +232,12 @@
 
     // Click handler — use transaction for atomic increment
     btn.addEventListener('click', async (e) => {
+      if (!connected) {
+        statusText.textContent = '⚠️ no connection to Firebase';
+        statusDot.className = 'dot offline';
+        return;
+      }
+
       const x = e.clientX;
       const y = e.clientY;
 
